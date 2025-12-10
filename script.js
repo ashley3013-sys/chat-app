@@ -182,4 +182,14 @@ function startChat(friendName) {
 // -------------------------
 function getChatId(user1, user2) {
   return [user1, user2].sort().join("_");
-    }
+}
+
+document.getElementById("logoutBtn").onclick = () => {
+  // Clear saved data
+  localStorage.removeItem("username");
+  localStorage.removeItem("phone");
+  localStorage.removeItem("currentFriend");
+
+  // Reload to show login page again
+  location.reload();
+};
