@@ -14,7 +14,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 let currentUser = ""; // Will be set after login
+let currentPhone = ""; // Store the phone number
 let friendUser = "Friend1"; // Keep default friend for demo
+let friendPhone = "0123456789"; // optional default friend phone for demo
 
 // -------------------
 // Step 0: Login form
@@ -28,8 +30,9 @@ document.getElementById("loginBtn").onclick = () => {
     return;
   }
 
-  // Set currentUser
+  // Set current user info
   currentUser = username;
+  currentPhone = phone;
 
   // Hide login, show chat
   document.getElementById("login-container").style.display = "none";
@@ -52,7 +55,8 @@ function initChat() {
     if (text.trim() === "") return;
 
     messagesRef.add({
-      sender: currentUser,
+      senderName: currentUser,
+      senderPhone: currentPhone,
       text: text,
       time: Date.now()
     });
@@ -68,7 +72,7 @@ function initChat() {
     snapshot.forEach(doc => {
       const data = doc.data();
       const p = document.createElement("p");
-      p.textContent = `${data.sender}: ${data.text}`;
+      p.textContent = `${data.senderName} (${data.senderPhone}): ${data.text}`;
       msgDiv.appendChild(p);
     });
 
