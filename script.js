@@ -71,9 +71,17 @@ function initChat() {
 
     snapshot.forEach(doc => {
       const data = doc.data();
-      const p = document.createElement("p");
-      p.textContent = `${data.senderName} (${data.senderPhone}): ${data.text}`;
-      msgDiv.appendChild(p);
+      const bubble = document.createElement("div");
+      bubble.classList.add("message");
+
+      if (data.senderName === currentUser) {
+        bubble.classList.add("you");
+      } else {
+        bubble.classList.add("friend");
+      }
+
+      bubble.textContent = `${data.senderName} (${data.senderPhone}): ${data.text}`;
+      msgDiv.appendChild(bubble);
     });
 
     msgDiv.scrollTop = msgDiv.scrollHeight;
