@@ -1,4 +1,6 @@
-// Firebase config (same as before)
+// -------------------------
+// Firebase Initialization
+// -------------------------
 const firebaseConfig = {
   apiKey: "AIzaSyAHLfu2gN-FRYyyXxnVWCwpKNvibC5s7Sg",
   authDomain: "chat-app-274e3.firebaseapp.com",
@@ -8,99 +10,158 @@ const firebaseConfig = {
   appId: "1:695289736732:web:5f38506a9a5eeef3f839d9",
   measurementId: "G-SRLH7JPG9V"
 };
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+// -------------------------
+// Global Variables
+// -------------------------
 let currentUser = "";
 let currentPhone = "";
-let currentFriend = ""; // selected friend
-let friends = [
-  { name: "Friend1", phone: "0123456789" },
-  { name: "Friend2", phone: "0987654321" },
-  { name: "Friend3", phone: "0112233445" }
-];
+let currentFriend = "";
+let friends = [];
 
+let unsubscribe = null; // chat listener
+
+const loginContainer = document.getElementById("login-container");
+const chatContainer = document.getElementById("chat-container");
+const friendSelect = document.getElementById("friendSelect");
 const messagesDiv = document.getElementById("messages");
 
-// -------------------
-// Step 0: Check localStorage for saved login
-// -------------------
+// -------------------------
+// Reload: Auto Login
+// -------------------------
 const savedName = localStorage.getItem("username");
 const savedPhone = localStorage.getItem("phone");
+const savedFriend = localStorage.getItem("currentFriend");
 
 if (savedName && savedPhone) {
   currentUser = savedName;
   currentPhone = savedPhone;
-  showChatContainer();
-  populateFriendSelect();
-  startChat();
+
+  loginContainer.style.display = "none";
+  chatContainer.style.display = "block";
+
+  loadFriends(() => {
+    currentFriend = savedFriend || "";
+    if (!currentFriend && friends.length > 0) {
+      currentFriend = friends[0].username;
+    }
+    friendSelect.value = currentFriend;
+    startChat(currentFriend);
+  });
 }
 
-// -------------------
-// Step 1: Login
-// -------------------
-document.getElementById("loginBtn").onclick = () => {
+// -------------------------
+// LOGIN BUTTON
+// -------------------------
+document.getElementById("loginBtn").onclick = async () => {
   const username = document.getElementById("usernameInput").value.trim();
   const phone = document.getElementById("phoneInput").value.trim();
 
-  if (!username || !phone) return alert("Enter username and phone.");
+  if (!username || !phone) return alert("Please enter username AND phone number.");
 
   currentUser = username;
   currentPhone = phone;
 
+  // Save login locally
   localStorage.setItem("username", currentUser);
   localStorage.setItem("phone", currentPhone);
 
-  showChatContainer();
-  populateFriendSelect();
-  startChat();
+  // Save user in Firestore
+  await db.collection("users").doc(currentPhone).set({
+    username: currentUser,
+    phone: currentPhone
+  }, { merge: true });
+
+  loginContainer.style.display = "none";
+  chatContainer.style.display = "block";
+
+  loadFriends(() => {
+    currentFriend = friends.length ? friends[0].username : "";
+    friendSelect.value = currentFriend;
+    startChat(currentFriend);
+  });
 };
 
-// -------------------
-// Helper: show chat container
-// -------------------
-function showChatContainer() {
-  document.getElementById("login-container").style.display = "none";
-  document.getElementById("chat-container").style.display = "block";
-}
+// -------------------------
+// LOAD REAL FRIENDS
+// -------------------------
+function loadFriends(callback) {
+  db.collection("users").onSnapshot(snapshot => {
+    friends = [];
 
-// -------------------
-// Step 2: Populate friend dropdown
-// -------------------
-function populateFriendSelect() {
-  const select = document.getElementById("friendSelect");
-  select.innerHTML = "";
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.phone !== currentPhone) friends.push(data);
+    });
 
-  friends.forEach(friend => {
-    const option = document.createElement("option");
-    option.value = friend.name;
-    option.textContent = `${friend.name} (${friend.phone})`;
-    select.appendChild(option);
+    updateFriendDropdown();
+
+    if (callback) callback();
   });
-
-  // Select first friend by default
-  currentFriend = select.value;
-  select.onchange = () => {
-    currentFriend = select.value;
-    startChat(); // reload messages for the selected friend
-  };
 }
 
-// -------------------
-// Step 3: Chat logic
-// -------------------
-let unsubscribe = null; // for detaching previous listener
+// -------------------------
+// UPDATE FRIEND SELECT UI
+// -------------------------
+function updateFriendDropdown() {
+  friendSelect.innerHTML = "";
 
-function startChat() {
-  // Detach previous listener if any
+  friends.forEach(f => {
+    const opt = document.createElement("option");
+    opt.value = f.username;
+    opt.textContent = `${f.username} (${f.phone})`;
+    friendSelect.appendChild(opt);
+  });
+}
+
+// -------------------------
+// FRIEND CHANGED
+// -------------------------
+friendSelect.onchange = () => {
+  currentFriend = friendSelect.value;
+  localStorage.setItem("currentFriend", currentFriend);
+  startChat(currentFriend);
+};
+
+// -------------------------
+// START CHAT WITH FRIEND
+// -------------------------
+function startChat(friendName) {
+  if (!friendName) return;
+
+  // Stop old listener
   if (unsubscribe) unsubscribe();
 
   messagesDiv.innerHTML = "";
-  const friend = friends.find(f => f.name === currentFriend);
-  const chatId = getChatId(currentUser, currentFriend);
+
+  const chatId = getChatId(currentUser, friendName);
   const messagesRef = db.collection("chats").doc(chatId).collection("messages");
 
-  // Send message
+  // Listen for messages
+  unsubscribe = messagesRef.orderBy("time").onSnapshot(snapshot => {
+    messagesDiv.innerHTML = "";
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+
+      const bubble = document.createElement("div");
+      bubble.className = data.senderName === currentUser ? "msg you" : "msg friend";
+
+      bubble.innerHTML = `
+        <strong>${data.senderName} (${data.senderPhone})</strong><br>
+        ${data.text}
+      `;
+
+      messagesDiv.appendChild(bubble);
+    });
+
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+
+  // SEND BUTTON
   document.getElementById("sendBtn").onclick = () => {
     const text = document.getElementById("msgInput").value.trim();
     if (!text) return;
@@ -108,31 +169,17 @@ function startChat() {
     messagesRef.add({
       senderName: currentUser,
       senderPhone: currentPhone,
-      text,
+      text: text,
       time: Date.now()
     });
 
     document.getElementById("msgInput").value = "";
   };
-
-  // Listen for messages
-  unsubscribe = messagesRef.orderBy("time").onSnapshot(snapshot => {
-    messagesDiv.innerHTML = "";
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      const bubble = document.createElement("div");
-      bubble.classList.add("message");
-      bubble.classList.add(data.senderName === currentUser ? "you" : "friend");
-      bubble.textContent = `${data.senderName} (${data.senderPhone}): ${data.text}`;
-      messagesDiv.appendChild(bubble);
-    });
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  });
 }
 
-// -------------------
-// Utility: generate consistent chat ID
-// -------------------
+// -------------------------
+// Generate Chat ID
+// -------------------------
 function getChatId(user1, user2) {
   return [user1, user2].sort().join("_");
-}
+    }
