@@ -13,52 +13,72 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// -------------------
-// Step 1: Define your users
-// -------------------
-// For demo purposes, hardcode users
-const currentUser = "Thong";
-const friendUser = "Friend1";
-
-// Generate a consistent chat ID for this pair
-function getChatId(user1, user2) {
-  return [user1, user2].sort().join("_"); // e.g. "Ashley_Friend1"
-}
-
-const chatId = getChatId(currentUser, friendUser);
-const messagesRef = db.collection("chats").doc(chatId).collection("messages");
+let currentUser = ""; // Will be set after login
+let friendUser = "Friend1"; // Keep default friend for demo
 
 // -------------------
-// Step 2: Send a message
+// Step 0: Login form
 // -------------------
-document.getElementById("sendBtn").onclick = () => {
-  const text = document.getElementById("msgInput").value;
+document.getElementById("loginBtn").onclick = () => {
+  const username = document.getElementById("usernameInput").value.trim();
+  const phone = document.getElementById("phoneInput").value.trim();
 
-  if (text.trim() === "") return;
+  if (username === "" || phone === "") {
+    alert("Please enter both username and phone number.");
+    return;
+  }
 
-  messagesRef.add({
-    sender: currentUser,
-    text: text,
-    time: Date.now()
-  });
+  // Set currentUser
+  currentUser = username;
 
-  document.getElementById("msgInput").value = "";
+  // Hide login, show chat
+  document.getElementById("login-container").style.display = "none";
+  document.getElementById("chat-container").style.display = "block";
+
+  initChat(); // start the chat logic
 };
 
 // -------------------
-// Step 3: Listen for new messages
+// Step 1: Chat logic in a function
 // -------------------
-messagesRef.orderBy("time").onSnapshot(snapshot => {
-  const msgDiv = document.getElementById("messages");
-  msgDiv.innerHTML = "";
+function initChat() {
+  const chatId = getChatId(currentUser, friendUser);
+  const messagesRef = db.collection("chats").doc(chatId).collection("messages");
 
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    const p = document.createElement("p");
-    p.textContent = `${data.sender}: ${data.text}`;
-    msgDiv.appendChild(p);
+  // Send message
+  document.getElementById("sendBtn").onclick = () => {
+    const text = document.getElementById("msgInput").value;
+
+    if (text.trim() === "") return;
+
+    messagesRef.add({
+      sender: currentUser,
+      text: text,
+      time: Date.now()
+    });
+
+    document.getElementById("msgInput").value = "";
+  };
+
+  // Listen for messages
+  messagesRef.orderBy("time").onSnapshot(snapshot => {
+    const msgDiv = document.getElementById("messages");
+    msgDiv.innerHTML = "";
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const p = document.createElement("p");
+      p.textContent = `${data.sender}: ${data.text}`;
+      msgDiv.appendChild(p);
+    });
+
+    msgDiv.scrollTop = msgDiv.scrollHeight;
   });
+}
 
-  // Scroll to bottom on new message
-  msgDiv.scrollTop = msgDiv.scrollHeight;
-});
+// -------------------
+// Utility function: generate chatId
+// -------------------
+function getChatId(user1, user2) {
+  return [user1, user2].sort().join("_"); // e.g. "Ashley_Friend1"
+}
