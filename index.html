@@ -6,12 +6,20 @@
     <title>Chat App</title>
   </head>
   <body>
-    <div class="chat-container">
-      <h2>Chat App</h2>
+    <div id="login-container">
+      <h2>Login</h2>
+      <input id="usernameInput" placeholder="Enter username">
+      <input id="phoneInput" placeholder="Enter phone number">
+      <button id="loginBtn">Login</button>
+    </div>
+
+    <div id="chat-container" style="display:none;">
+      <h2>Private Chat</h2>
       <div id="messages"></div>
       <input id="msgInput" placeholder="Type a message...">
       <button id="sendBtn">Send</button>
     </div>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="script.js"></script>
