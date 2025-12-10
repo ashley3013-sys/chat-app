@@ -1,33 +1,56 @@
 <!DOCTYPE html>
 <html lang="en-US">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat App</title>
-  </head>
-  <body>
-    <div id="login-container">
-      <h2>Login</h2>
-      <input id="usernameInput" placeholder="Enter username">
-      <input id="phoneInput" placeholder="Enter phone number">
-      <button id="loginBtn">Login</button>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ashley Chat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- LOGIN -->
+    <div id="login-container" class="card">
+      <h2>Welcome — Sign in</h2>
+      <input id="usernameInput" placeholder="Username" />
+      <input id="phoneInput" placeholder="Phone number" />
+      <button id="loginBtn">Sign in / Register</button>
     </div>
 
+    <!-- CHAT -->
     <div id="chat-container" style="display:none;">
-      <h2>Chat</h2>
+      <header class="chat-header">
+        <div>
+          <strong id="meLabel"></strong><br>
+          <small id="mePhone"></small>
+        </div>
+        <div class="header-actions">
+          <button id="logoutBtn">Logout</button>
+        </div>
+      </header>
 
-      <label for="friendSelect">Choose a friend:</label>
-      <select id="friendSelect"></select>
+      <div class="main">
+        <aside class="users-panel">
+          <h3>Users</h3>
+          <ul id="usersList" class="users-list"></ul>
+        </aside>
 
-      <div id="messages"></div>
-      <input id="msgInput" placeholder="Type a message...">
-      <button id="sendBtn">Send</button>
+        <section class="chat-panel">
+          <div id="messages" class="messages"></div>
+
+          <div class="composer">
+            <input id="msgInput" placeholder="Type a message..." />
+            <button id="sendBtn">Send</button>
+          </div>
+        </section>
+      </div>
     </div>
+  </div>
 
-    <button id="logoutBtn">Logout</button>
+  <!-- Firebase SDKs v8 (works with code below) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="script.js"></script>
-  </body>
+  <!-- Your main script -->
+  <script src="script.js"></script>
+</body>
 </html>
