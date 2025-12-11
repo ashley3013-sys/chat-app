@@ -11,7 +11,7 @@ const firebaseConfig = {
   measurementId: "G-SRLH7JPG9V"
 };
 
-// Initialize Firebase app
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -34,9 +34,9 @@ const sendBtn = document.getElementById("sendBtn");
 // ================================
 // Variables
 // ================================
-let currentUser = null;       // Object {username, phone}
-let activeChatId = null;      // Chat ID for private conversation
-let messagesRef = null;       // Firestore collection reference
+let currentUser = null;
+let activeChatId = null;
+let messagesRef = null;
 
 // ================================
 // Login button click
@@ -52,12 +52,13 @@ loginBtn.onclick = async function () {
 
   currentUser = { username: username, phone: phone };
 
-  // Save or update user in Firestore
   try {
+    // Save/update user
     await db.collection("users").doc(phone).set({
       username: username,
       phone: phone,
-      lastActive: Date.now()
+      lastActive: Date.now(),
+      isOnline: true
     });
   } catch (err) {
     console.error("Error saving user:", err);
@@ -78,24 +79,54 @@ loginBtn.onclick = async function () {
 // ================================
 // Logout button click
 // ================================
-logoutBtn.onclick = function () {
-  // Clear current user and active chat
+logoutBtn.onclick = async function () {
+  if (currentUser) {
+    // On login
+    await db.collection("users").doc(currentUser.phone).set({
+      username: username,
+      phone: phone,
+      lastActive: Date.now(),
+      isOnline: true
+    });
+
+    // On logout
+    await db.collection("users").doc(currentUser.phone).update({
+      isOnline: false
+    });
+
+    // On window close
+    window.addEventListener("beforeunload", async () => {
+      if (currentUser) {
+        await db.collection("users").doc(currentUser.phone).update({
+          isOnline: false
+        });
+      }
+    });
+
   currentUser = null;
   activeChatId = null;
   messagesRef = null;
 
-  // Reset UI
   usernameInput.value = "";
   phoneInput.value = "";
   meLabel.textContent = "";
   mePhone.textContent = "";
   loginPage.style.display = "block";
   chatPage.style.display = "none";
-
-  // Clear messages and users list
   messagesDiv.innerHTML = "";
   usersList.innerHTML = "";
 };
+
+// ================================
+// Set offline status on window close
+// ================================
+window.addEventListener("beforeunload", async () => {
+  if (currentUser) {
+    await db.collection("users").doc(currentUser.phone).update({
+      isOnline: false
+    });
+  }
+});
 
 // ================================
 // Load users list
@@ -107,39 +138,47 @@ function loadUsers() {
     snapshot.forEach(function (doc) {
       const user = doc.data();
 
-      // Skip current user
       if (user.phone === currentUser.phone) return;
 
-      // Create user list item
       const li = document.createElement("li");
-      li.textContent = `${user.username} (${user.phone})`;
       li.dataset.phone = user.phone;
       li.dataset.username = user.username;
       li.style.cursor = "pointer";
       li.style.padding = "5px 10px";
       li.style.borderRadius = "5px";
       li.style.marginBottom = "4px";
+      li.style.display = "flex";
+      li.style.alignItems = "center";
+      li.style.justifyContent = "space-between";
 
-      // Click to select user for chat
+      // Username + phone text
+      const textSpan = document.createElement("span");
+      textSpan.textContent = `${user.username} (${user.phone})`;
+      li.appendChild(textSpan);
+
+      // Online/Offline dot
+      const dot = document.createElement("span");
+      dot.style.width = "10px";
+      dot.style.height = "10px";
+      dot.style.borderRadius = "50%";
+      dot.style.backgroundColor = user.isOnline ? "#4CAF50" : "#999";
+      li.appendChild(dot);
+
+      // Click to start chat
       li.onclick = function () {
-        // Remove highlight from all users
         Array.from(usersList.children).forEach(c => {
           c.style.backgroundColor = "";
           c.style.color = "";
         });
-
-        // Highlight selected user
-        li.style.backgroundColor = "#4CAF50"; // Green
+        li.style.backgroundColor = "#4CAF50";
         li.style.color = "#fff";
 
-        // Start chat with selected user
         startChat({ username: user.username, phone: user.phone });
       };
 
       usersList.appendChild(li);
     });
 
-    // If no other users
     if (usersList.innerHTML === "") {
       const li = document.createElement("li");
       li.textContent = "No other users online";
@@ -148,31 +187,68 @@ function loadUsers() {
     }
   });
 }
-
 // ================================
 // Start chat with selected user
 // ================================
 function startChat(user) {
   const otherPhone = user.phone;
-  // Generate consistent chat ID
   activeChatId = [currentUser.phone, otherPhone].sort().join("_");
-
-  // Reference messages collection
   messagesRef = db.collection("chats").doc(activeChatId).collection("messages");
 
   // Load messages
   loadMessages();
+
+  // Typing indicator for other users
+  db.collection("chats").doc(activeChatId).collection("typing")
+    .onSnapshot(snapshot => {
+      const otherTyping = [];
+      snapshot.forEach(doc => {
+        if (doc.id !== currentUser.phone) {
+          otherTyping.push(doc.data().username);
+        }
+      });
+
+      let typingDiv = document.getElementById("typingIndicator");
+      if (!typingDiv) {
+        typingDiv = document.createElement("div");
+        typingDiv.id = "typingIndicator";
+        typingDiv.style.fontSize = "12px";
+        typingDiv.style.color = "#666";
+        typingDiv.style.marginTop = "4px";
+        messagesDiv.parentNode.appendChild(typingDiv);
+      }
+
+      if (otherTyping.length > 0) {
+        typingDiv.textContent = `${otherTyping.join(", ")} is typing...`;
+      } else {
+        typingDiv.textContent = "";
+      }
+    });
 }
 
 // ================================
-// Send message button
+// Typing indicator listener
+// ================================
+msgInput.addEventListener("input", () => {
+  if (!activeChatId || !currentUser) return;
+
+  const typingRef = db.collection("chats").doc(activeChatId).collection("typing").doc(currentUser.phone);
+
+  if (msgInput.value.trim() !== "") {
+    typingRef.set({ username: currentUser.username });
+  } else {
+    typingRef.delete().catch(() => {});
+  }
+});
+
+// ================================
+// Send message
 // ================================
 sendBtn.onclick = function () {
   if (!currentUser) {
     alert("No user signed in!");
     return;
   }
-
   if (!messagesRef) {
     alert("Select a user to chat with first.");
     return;
@@ -181,7 +257,6 @@ sendBtn.onclick = function () {
   const text = msgInput.value.trim();
   if (text === "") return;
 
-  // Add message to Firestore
   messagesRef.add({
     senderName: currentUser.username,
     senderPhone: currentUser.phone,
@@ -193,7 +268,7 @@ sendBtn.onclick = function () {
 };
 
 // ================================
-// Load messages in real-time
+// Load messages
 // ================================
 function loadMessages() {
   messagesRef.orderBy("time").onSnapshot(function (snapshot) {
@@ -209,7 +284,6 @@ function loadMessages() {
       msgBox.style.borderRadius = "10px";
       msgBox.style.wordBreak = "break-word";
 
-      // Align right for current user
       if (data.senderPhone === currentUser.phone) {
         msgBox.style.backgroundColor = "#4CAF50";
         msgBox.style.color = "#fff";
@@ -220,20 +294,17 @@ function loadMessages() {
         msgBox.style.marginRight = "auto";
       }
 
-      // Username + phone
       const header = document.createElement("div");
       header.textContent = `${data.senderName} (${data.senderPhone})`;
       header.style.fontSize = "12px";
       header.style.color = data.senderPhone === currentUser.phone ? "#dcefdc" : "#666";
       header.style.marginBottom = "2px";
 
-      // Message text
       const textLine = document.createElement("div");
       textLine.textContent = data.text;
       textLine.style.fontSize = "16px";
       textLine.style.fontWeight = "500";
 
-      // Timestamp
       const timeLine = document.createElement("div");
       const d = new Date(data.time);
       timeLine.textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -248,7 +319,6 @@ function loadMessages() {
       messagesDiv.appendChild(msgBox);
     });
 
-    // Auto-scroll
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
