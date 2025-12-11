@@ -1,6 +1,6 @@
-// ----------------------
+// ===========================
 // Firebase config
-// ----------------------
+// ===========================
 const firebaseConfig = {
   apiKey: "AIzaSyAHLfu2gN-FRYyyXxnVWCwpKNvibC5s7Sg",
   authDomain: "chat-app-274e3.firebaseapp.com",
@@ -11,103 +11,133 @@ const firebaseConfig = {
   measurementId: "G-SRLH7JPG9V"
 };
 
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+// ===========================
+// DOM Elements
+// ===========================
+const loginPage = document.getElementById("loginPage");
+const chatPage = document.getElementById("chatPage");
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const usernameInput = document.getElementById("usernameInput");
+const phoneInput = document.getElementById("phoneInput");
+const meLabel = document.getElementById("meLabel");
+const mePhone = document.getElementById("mePhone");
+const usersList = document.getElementById("usersList");
+const messagesDiv = document.getElementById("messages");
+const msgInput = document.getElementById("msgInput");
+const sendBtn = document.getElementById("sendBtn");
 
-// ----------------------
-// Login system
-// ----------------------
-let currentUser = null;
+// ===========================
+// Variables
+// ===========================
+let currentUser = null;         // Current logged-in user
+let activeChatId = null;        // Current chat ID
+let messagesRef = null;         // Reference to Firestore collection of messages
 
-document.getElementById("loginBtn").onclick = async () => {
-  const username = document.getElementById("usernameInput").value.trim();
-  const phone = document.getElementById("phoneInput").value.trim();
+// ===========================
+// LOGIN / REGISTER
+// ===========================
+loginBtn.onclick = async () => {
+  const username = usernameInput.value.trim();
+  const phone = phoneInput.value.trim();
 
   if (!username || !phone) {
-    alert("Please enter username and phone.");
+    alert("Please enter both username and phone number.");
     return;
   }
 
-  // Save user in Firestore
+  currentUser = { username, phone };
+
+  // Save or update user in Firestore
   await db.collection("users").doc(phone).set({
     username,
     phone,
     lastActive: Date.now()
   });
 
-  currentUser = { username, phone };
+  // Update UI
+  meLabel.textContent = username;
+  mePhone.textContent = phone;
+  loginPage.style.display = "none";
+  chatPage.style.display = "block";
 
-  // Switch to chat UI
-  document.getElementById("loginPage").style.display = "none";
-  document.getElementById("chatPage").style.display = "block";
-
+  // Load users list
   loadUsers();
 };
 
-
-// ----------------------
-// Load user list (REAL users)
-// ----------------------
+// ===========================
+// LOAD USERS LIST
+// ===========================
 function loadUsers() {
   db.collection("users").onSnapshot(snapshot => {
-    const list = document.getElementById("userList");
-    list.innerHTML = "";
+    usersList.innerHTML = ""; // Clear previous list
 
     snapshot.forEach(doc => {
       const user = doc.data();
 
-      // Skip yourself
+      // Skip current user
       if (user.phone === currentUser.phone) return;
 
-      const option = document.createElement("option");
-      option.value = user.phone;
-      option.textContent = `${user.username} (${user.phone})`;
-      list.appendChild(option);
+      // Create user element
+      const li = document.createElement("li");
+      li.textContent = `${user.username} (${user.phone})`;
+      li.dataset.phone = user.phone;
+      li.dataset.username = user.username;
+
+      // Click to start chat
+      li.onclick = () => {
+        startChat(user);
+      };
+
+      usersList.appendChild(li);
     });
+
+    // If no other users, show placeholder
+    if (usersList.innerHTML === "") {
+      const li = document.createElement("li");
+      li.textContent = "No other users online";
+      li.style.color = "#999";
+      usersList.appendChild(li);
+    }
   });
 }
 
+// ===========================
+// START CHAT
+// ===========================
+function startChat(user) {
+  const otherPhone = user.phone;
 
-// ----------------------
-// Chat ID generator (private chat)
-// ----------------------
-function getChatId(phoneA, phoneB) {
-  return [phoneA, phoneB].sort().join("_");
+  // Generate consistent chat ID
+  activeChatId = [currentUser.phone, otherPhone].sort().join("_");
+
+  // Reference to messages
+  messagesRef = db.collection("chats").doc(activeChatId).collection("messages");
+
+  // Load chat messages
+  loadMessages();
 }
 
-let activeChatId = null;
-let messagesRef = null;
+// ===========================
+// SEND MESSAGE
+// ===========================
+sendBtn.onclick = () => {
+  if (!currentUser) {
+    alert("No user signed in!");
+    return;
+  }
 
-
-// ----------------------
-// When selecting a user to chat with
-// ----------------------
-document.getElementById("userList").onchange = () => {
-  const otherPhone = document.getElementById("userList").value;
-
-  activeChatId = getChatId(currentUser.phone, otherPhone);
-  messagesRef = db
-    .collection("chats")
-    .doc(activeChatId)
-    .collection("messages");
-
-  loadMessages();
-};
-
-
-// ----------------------
-// Send a message
-// ----------------------
-document.getElementById("sendBtn").onclick = () => {
   if (!messagesRef) {
     alert("Select a user to chat with first.");
     return;
   }
 
-  const text = document.getElementById("msgInput").value;
-
-  if (text.trim() === "") return;
+  const text = msgInput.value.trim();
+  if (text === "") return;
 
   messagesRef.add({
     senderName: currentUser.username,
@@ -116,23 +146,21 @@ document.getElementById("sendBtn").onclick = () => {
     time: Date.now()
   });
 
-  document.getElementById("msgInput").value = "";
+  msgInput.value = "";
 };
 
-
-// ----------------------
-// Load messages (live)
-// ----------------------
+// ===========================
+// LOAD MESSAGES LIVE
+// ===========================
 function loadMessages() {
   messagesRef.orderBy("time").onSnapshot(snapshot => {
-    const msgDiv = document.getElementById("messages");
-    msgDiv.innerHTML = "";
+    messagesDiv.innerHTML = ""; // Clear old messages
 
     snapshot.forEach(doc => {
       const data = doc.data();
 
-      const box = document.createElement("div");
-      box.style.marginBottom = "14px";
+      const msgBox = document.createElement("div");
+      msgBox.style.marginBottom = "14px";
 
       // Username + phone (grey small)
       const header = document.createElement("div");
@@ -141,30 +169,46 @@ function loadMessages() {
       header.style.color = "#666";
       header.style.marginBottom = "2px";
 
-      // Main message text (black bigger)
-      const messageText = document.createElement("div");
-      messageText.textContent = data.text;
-      messageText.style.fontSize = "16px";
-      messageText.style.color = "#000";
-      messageText.style.fontWeight = "500";
+      // Main message text (black, bigger)
+      const textLine = document.createElement("div");
+      textLine.textContent = data.text;
+      textLine.style.fontSize = "16px";
+      textLine.style.color = "#000";
+      textLine.style.fontWeight = "500";
 
-      // Timestamp (grey tiny)
-      const time = document.createElement("div");
+      // Timestamp on new line
+      const timeLine = document.createElement("div");
       const d = new Date(data.time);
-      time.textContent = d.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-      time.style.fontSize = "11px";
-      time.style.color = "#999";
-      time.style.marginTop = "4px";
+      timeLine.textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      timeLine.style.fontSize = "11px";
+      timeLine.style.color = "#999";
+      timeLine.style.marginTop = "3px";
 
-      box.appendChild(header);
-      box.appendChild(messageText);
-      box.appendChild(time);
-      msgDiv.appendChild(box);
+      msgBox.appendChild(header);
+      msgBox.appendChild(textLine);
+      msgBox.appendChild(timeLine);
+
+      messagesDiv.appendChild(msgBox);
     });
 
-    msgDiv.scrollTop = msgDiv.scrollHeight;
+    // Auto-scroll to bottom
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
+
+// ===========================
+// LOGOUT
+// ===========================
+logoutBtn.onclick = () => {
+  currentUser = null;
+  activeChatId = null;
+  messagesRef = null;
+
+  usernameInput.value = "";
+  phoneInput.value = "";
+  meLabel.textContent = "";
+  mePhone.textContent = "";
+
+  loginPage.style.display = "block";
+  chatPage.style.display = "none";
+};
