@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en-US">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Ashley Chat</title>
   <link rel="stylesheet" href="style.css">
@@ -9,7 +9,7 @@
 <body>
   <div id="app">
     <!-- LOGIN -->
-    <div id="login-container" class="card">
+    <div id="loginPage" class="card">
       <h2>Welcome — Sign in</h2>
       <input id="usernameInput" placeholder="Username" />
       <input id="phoneInput" placeholder="Phone number" />
@@ -17,7 +17,7 @@
     </div>
 
     <!-- CHAT -->
-    <div id="chat-container" style="display:none;">
+    <div id="chatPage" style="display:none;">
       <header class="chat-header">
         <div>
           <strong id="meLabel"></strong><br>
@@ -46,7 +46,7 @@
     </div>
   </div>
 
-  <!-- Firebase SDKs v8 (works with code below) -->
+  <!-- Firebase SDKs v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
