@@ -43,7 +43,6 @@ let messagesRef = null;
 // Login button click
 // ================================
 loginBtn.onclick = async function () {
-  console.log("login button clicked");
   const username = usernameInput.value.trim();
   const phone = phoneInput.value.trim();
 
