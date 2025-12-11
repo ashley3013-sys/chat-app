@@ -1,3 +1,4 @@
+document.addEventListener("DOMContentLoaded", () => {
 // ================================
 // Firebase configuration
 // ================================
@@ -42,6 +43,7 @@ let messagesRef = null;
 // Login button click
 // ================================
 loginBtn.onclick = async function () {
+  console.log("login button clicked");
   const username = usernameInput.value.trim();
   const phone = phoneInput.value.trim();
 
@@ -85,6 +87,7 @@ logoutBtn.onclick = async function () {
     await db.collection("users").doc(currentUser.phone).update({
       isOnline: false
     });
+  }
 
   currentUser = null;
   activeChatId = null;
@@ -305,3 +308,4 @@ function loadMessages() {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
+});
