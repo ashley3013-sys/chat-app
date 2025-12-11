@@ -103,14 +103,14 @@ logoutBtn.onclick = async function () {
 // ================================
 // Set offline status on window close
 // ================================
-window.addEventListener("beforeunload", async () => {
+window.addEventListener("beforeunload", () => {
   if (currentUser) {
-    await db.collection("users").doc(currentUser.phone).update({
-      isOnline: false
-    });
+    navigator.sendBeacon(
+      `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/users/${currentUser.phone}`,
+      JSON.stringify({ isOnline: false })
+    );
   }
 });
-
 // ================================
 // Load users list
 // ================================
