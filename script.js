@@ -81,26 +81,9 @@ loginBtn.onclick = async function () {
 // ================================
 logoutBtn.onclick = async function () {
   if (currentUser) {
-    // On login
-    await db.collection("users").doc(currentUser.phone).set({
-      username: username,
-      phone: phone,
-      lastActive: Date.now(),
-      isOnline: true
-    });
-
     // On logout
     await db.collection("users").doc(currentUser.phone).update({
       isOnline: false
-    });
-
-    // On window close
-    window.addEventListener("beforeunload", async () => {
-      if (currentUser) {
-        await db.collection("users").doc(currentUser.phone).update({
-          isOnline: false
-        });
-      }
     });
 
   currentUser = null;
