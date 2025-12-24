@@ -38,6 +38,7 @@ const sendBtn = document.getElementById("sendBtn");
 let currentUser = null;
 let activeChatId = null;
 let messagesRef = null;
+let heartbeatTimer = null;
 
 // ================================
 // Login button click
@@ -58,8 +59,7 @@ loginBtn.onclick = async function () {
     await db.collection("users").doc(phone).set({
       username: username,
       phone: phone,
-      lastActive: Date.now(),
-      isOnline: true
+      lastActive: Date.now()
     });
   } catch (err) {
     console.error("Error saving user:", err);
@@ -72,6 +72,13 @@ loginBtn.onclick = async function () {
   mePhone.textContent = phone;
   loginPage.style.display = "none";
   chatPage.style.display = "block";
+  heartbeatTimer = setInterval(() => {
+  if (currentUser) {
+    db.collection("users").doc(currentUser.phone).update({
+      lastActive: Date.now()
+    });
+  }
+}, 5000);
 
   // Load users list
   loadUsers();
@@ -82,10 +89,13 @@ loginBtn.onclick = async function () {
 // ================================
 logoutBtn.onclick = async function () {
   if (currentUser) {
-    // On logout
     await db.collection("users").doc(currentUser.phone).update({
-      isOnline: false
+      lastActive: Date.now()
     });
+  }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
   }
 
   currentUser = null;
@@ -101,18 +111,7 @@ logoutBtn.onclick = async function () {
   messagesDiv.innerHTML = "";
   usersList.innerHTML = "";
 };
-
-// ================================
-// Set offline status on window close
-// ================================
-window.addEventListener("beforeunload", () => {
-  if (currentUser) {
-    navigator.sendBeacon(
-      `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/users/${currentUser.phone}`,
-      JSON.stringify({ isOnline: false })
-    );
-  }
-});
+  
 // ================================
 // Load users list
 // ================================
@@ -146,7 +145,12 @@ function loadUsers() {
       dot.style.width = "10px";
       dot.style.height = "10px";
       dot.style.borderRadius = "50%";
-      dot.style.backgroundColor = user.isOnline ? "#4CAF50" : "#999";
+      const now = Date.now();
+      const ONLINE_TIMEOUT = 45000;
+
+      const isOnline = user.lastActive && (now - user.lastActive < ONLINE_TIMEOUT);
+      dot.style.backgroundColor = isOnline ? "#4CAF50" : "#999";
+
       li.appendChild(dot);
 
       // Click to start chat
@@ -189,7 +193,13 @@ function startChat(user) {
       const otherTyping = [];
       snapshot.forEach(doc => {
         if (doc.id !== currentUser.phone) {
-          otherTyping.push(doc.data().username);
+          const TYPING_TIMEOUT = 2500;
+          const data = doc.data();
+
+          if (Date.now() - data.time < TYPING_TIMEOUT) {
+            otherTyping.push(data.username);
+          }
+
         }
       });
 
@@ -220,7 +230,10 @@ msgInput.addEventListener("input", () => {
   const typingRef = db.collection("chats").doc(activeChatId).collection("typing").doc(currentUser.phone);
 
   if (msgInput.value.trim() !== "") {
-    typingRef.set({ username: currentUser.username });
+    typingRef.set({
+      username: currentUser.username,
+      time: Date.now()
+    });
   } else {
     typingRef.delete().catch(() => {});
   }
@@ -307,4 +320,15 @@ function loadMessages() {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
+
+// ================================
+// Handle tab close / refresh
+// ================================
+window.addEventListener('beforeunload', async (event) => {
+  if (currentUser) {
+    await db.collection("users").doc(currentUser.phone).update({
+      lastActive: Date.now()
+    });
+  }
+});
 });
